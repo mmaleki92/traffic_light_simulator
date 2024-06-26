@@ -1,120 +1,111 @@
 import pygame
 import sys
+from settings import FPS, BLACK, width, height
+from draw_objects import draw_road, draw_traffic_light, Car
+import random
 
 # Initialize Pygame
 pygame.init()
 
 # Set up the display
-width, height = 600, 600
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Crossroad Simulation")
 
-# Define colors
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GRAY = (200, 200, 200)
+def spawn_cars(cars, spawn_rate=0.1):
+    if random.random() < spawn_rate:
+        direction = random.choice(['vertical', 'horizontal'])
+        road_width = 100
+        lane_width = road_width // 2
+        quarter_lane = lane_width // 4  # Define quarter of a lane for precise positioning
+        
+        if direction == 'vertical':
+            # Base lane position is the center of each lane
+            lane_base = width // 2 - lane_width // 2 if random.choice([True, False]) else width // 2 + lane_width // 2
+            if random.choice([True, False]):
+                # Spawning from top, use right half of the lane
+                y_position = -30
+                speed = 2
+                lane_position = lane_base + 3 * quarter_lane  # Adjusted for the right half of the lane
+            else:
+                # Spawning from bottom, use left half of the lane
+                y_position = height + 30
+                speed = -2
+                lane_position = lane_base + quarter_lane  # Adjusted for the left half of the lane
+            car = Car(lane_position, y_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'vertical')
+        
+        else:
+            # Base lane position is the center of each lane
+            lane_base = height // 2 - lane_width // 2 if random.choice([True, False]) else height // 2 + lane_width // 2
+            if random.choice([True, False]):
+                # Spawning from left, use right half of the lane
+                x_position = -30
+                speed = 2
+                lane_position = lane_base + 3 * quarter_lane  # Adjusted for the right half of the lane
+            else:
+                # Spawning from right, use left half of the lane
+                x_position = width + 30
+                speed = -2
+                lane_position = lane_base + quarter_lane  # Adjusted for the left half of the lane
+            car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal')
+
+        cars.append(car)
+        print(f"Added {direction} car at: {lane_position}, {'top' if speed > 0 else 'bottom' if direction == 'vertical' else 'right' if speed > 0 else 'left'} with speed {speed}")
+
+
+def manage_traffic_lights(cars, lights):
+    for car in cars:
+        car.moving = True  # Assume the car can move unless a light says otherwise
+        for light in lights:
+            if car.direction == 'horizontal' and light['vertical'] and not light['green']:
+                if light['pos'][0] - 150 <= car.rect.right < light['pos'][0] + 150:
+                    car.moving = False
+            elif car.direction == 'vertical' and not light['vertical'] and not light['green']:
+                if light['pos'][1] - 150 <= car.rect.bottom < light['pos'][1] + 150:
+                    car.moving = False
+
+
+cars = [
+    Car(width // 4, height // 2 - 10, (0, 0, 255), 2),  # Blue car
+    Car(width // 4, height // 2 + 30, (255, 0, 0), 2)   # Red car
+]
 
 # Frame rate
 clock = pygame.time.Clock()
-def draw_traffic_light(surface, pos, red_on, yellow_on, green_on, vertical=False):
-    light_width, light_height = (20, 60) if not vertical else (60, 20)
-    padding = 3
-    circle_radius = 6
-    black = (0, 0, 0)
-    gray = (50, 50, 50)
-    red = (255, 0, 0) if red_on else gray
-    yellow = (255, 255, 0) if yellow_on else gray
-    green = (0, 255, 0) if green_on else gray
-
-    # Draw the traffic light box
-    light_rect = pygame.Rect(pos[0], pos[1], light_width, light_height)
-    pygame.draw.rect(surface, black, light_rect)
-
-    # Calculate and draw the traffic light circles
-    if vertical:
-        # Horizontal layout
-        start_x = pos[0] + padding + circle_radius
-        y = pos[1] + light_height // 2
-        pygame.draw.circle(surface, red, (start_x, y), circle_radius)
-        pygame.draw.circle(surface, yellow, (start_x + 2 * (padding + circle_radius), y), circle_radius)
-        pygame.draw.circle(surface, green, (start_x + 4 * (padding + circle_radius), y), circle_radius)
-    else:
-        # Vertical layout
-        start_y = pos[1] + padding + circle_radius
-        x = pos[0] + light_width // 2
-        pygame.draw.circle(surface, red, (x, start_y), circle_radius)
-        pygame.draw.circle(surface, yellow, (x, start_y + 2 * (padding + circle_radius)), circle_radius)
-        pygame.draw.circle(surface, green, (x, start_y + 4 * (padding + circle_radius)), circle_radius)
-
-def draw_arrow(surface, color, start, end, arrow_size=15, opacity=153):
-    # Create a new surface with the same size as the main screen but with per-pixel alpha
-    arrow_surface = pygame.Surface((width, height), pygame.SRCALPHA)
-    # Set opacity (153 out of 255 for about 60% opacity)
-    # Draw the line and arrowhead
-    pygame.draw.line(arrow_surface, color + (opacity,), start, end, 2)
-    rotation = pygame.math.Vector2(start) - pygame.math.Vector2(end)
-    rotation.scale_to_length(arrow_size)
-    right = rotation.rotate(-45) + pygame.math.Vector2(end)
-    left = rotation.rotate(45) + pygame.math.Vector2(end)
-    pygame.draw.polygon(arrow_surface, color + (opacity,), [end, right, left])
-
-    # Blit the arrow surface onto the main surface
-    surface.blit(arrow_surface, (0, 0))
-
-
-def draw_road():
-    road_width = 100  # Increased road width
-    lane_width = road_width // 2
-    # Draw the vertical and horizontal roads
-    pygame.draw.rect(screen, GRAY, (width // 2 - road_width, 0, road_width * 2, height))
-    pygame.draw.rect(screen, GRAY, (0, height // 2 - road_width, width, road_width * 2))
-
-    # Dashed lines for the roads
-    for y in range(0, height, 40):  # Adjust spacing for larger roads
-        pygame.draw.line(screen, WHITE, (width // 2, y), (width // 2, y + 20), 3)  # Thicker lines
-    for x in range(0, width, 40):
-        pygame.draw.line(screen, WHITE, (x, height // 2), (x + 20, height // 2), 3)  # Thicker lines
-
-    # Corrected lane arrows for vertical road
-    # Left lane arrows (pointing upwards)
-    # draw_arrow(screen, WHITE, (width // 2 - lane_width, 3 * height // 4 + 30), (width // 2 - lane_width, 3 * height // 4))
-    # draw_arrow(screen, WHITE, (width // 2 - lane_width, height // 4 + 30), (width // 2 - lane_width, height // 4))
-
-    # # Right lane arrows (pointing downwards)
-    # draw_arrow(screen, WHITE, (width // 2 + lane_width, height // 4 - 30), (width // 2 + lane_width, height // 4))
-    # draw_arrow(screen, WHITE, (width // 2 + lane_width, 3 * height // 4 - 30), (width // 2 + lane_width, 3 * height // 4))
-
-    # # Horizontal road arrows (already corrected previously)
-    # draw_arrow(screen, WHITE, (width // 4, height // 2 - lane_width), (width // 4 + 30, height // 2 - lane_width))  # Left
-    # draw_arrow(screen, WHITE, (3 * width // 4 + 30, height // 2 + lane_width), (3 * width // 4, height // 2 + lane_width))  # Right
-    # draw_arrow(screen, WHITE, (width // 4 - 30, height // 2 + lane_width), (width // 4, height // 2 + lane_width))  # Left opposite lane
-    # draw_arrow(screen, WHITE, (3 * width // 4, height // 2 - lane_width), (3 * width // 4 + 30, height // 2 - lane_width))  # Right opposite lane
 
 def main():
     running = True
     # Initial traffic light status with orientation specified
     lights = [
-        {'pos': (width // 2 - 30, height // 2 - 120), 'red': True, 'yellow': False, 'green': False, 'vertical': True},
-        {'pos': (width // 2 - 30, height // 2 + 100), 'red': False, 'yellow': False, 'green': True, 'vertical': True},
+        {'pos': (width // 2 - 30, height // 2 - 120), 'red': False, 'yellow': False, 'green': False, 'vertical': True},
+        {'pos': (width // 2 - 30, height // 2 + 100), 'red': False, 'yellow': False, 'green': False, 'vertical': True},
         {'pos': (width // 2 - 120, height // 2 - 30), 'red': False, 'yellow': True, 'green': False, 'vertical': False},
-        {'pos': (width // 2 + 100, height // 2 - 30), 'red': False, 'yellow': False, 'green': True, 'vertical': False}
+        {'pos': (width // 2 + 100, height // 2 - 30), 'red': False, 'yellow': False, 'green': False, 'vertical': False}
     ]
 
     while running:
         for event in pygame.event.get():
-            if event.type is pygame.QUIT:
+            if event.type == pygame.QUIT:
                 running = False
 
         screen.fill(BLACK)
-        draw_road()
-        # Draw each traffic light
+        draw_road(screen)
+
+        spawn_cars(cars, spawn_rate=0.05)  # Adjust spawn rate as needed
+
+        manage_traffic_lights(cars, lights)
+
+        # Check and remove out-of-bounds cars, then draw remaining cars
+        for car in cars[:]:  # Iterate over a copy of the list
+            car.move()
+            if car.is_out_of_bounds(width, height):
+                cars.remove(car)
+            else:
+                car.draw(screen)
         for light in lights:
             draw_traffic_light(screen, light['pos'], light['red'], light['yellow'], light['green'], light.get('vertical', False))
+        
         pygame.display.flip()
-        clock.tick(60)
-
-    pygame.quit()
-    sys.exit()
+        clock.tick(FPS)
 
 
 if __name__ == '__main__':
