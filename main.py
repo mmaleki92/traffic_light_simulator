@@ -6,6 +6,13 @@ import random
 
 # Initialize Pygame
 pygame.init()
+# Initialize lane counters for each direction
+lane_counters = {
+    'top': 0,
+    'bottom': 0,
+    'left': 0,
+    'right': 0
+}
 
 # Set up the display
 screen = pygame.display.set_mode((width, height))
@@ -26,11 +33,15 @@ def spawn_cars(cars, spawn_rate=0.1):
                 y_position = -30
                 speed = 2
                 lane_position = lane_base + 3 * quarter_lane  # Adjusted for the right half of the lane
+                lane_counters['top'] += 1
+
             else:
                 # Spawning from bottom, use left half of the lane
                 y_position = height + 30
                 speed = -2
                 lane_position = lane_base + quarter_lane  # Adjusted for the left half of the lane
+                lane_counters['bottom'] += 1
+
             car = Car(lane_position, y_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'vertical')
         
         else:
@@ -41,11 +52,14 @@ def spawn_cars(cars, spawn_rate=0.1):
                 x_position = -30
                 speed = 2
                 lane_position = lane_base + 3 * quarter_lane  # Adjusted for the right half of the lane
+                lane_counters['left'] += 1
             else:
                 # Spawning from right, use left half of the lane
                 x_position = width + 30
                 speed = -2
                 lane_position = lane_base + quarter_lane  # Adjusted for the left half of the lane
+                lane_counters['right'] += 1
+
             car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal')
 
         cars.append(car)
@@ -69,6 +83,14 @@ cars = [
     Car(width // 4, height // 2 + 30, (255, 0, 0), 2)   # Red car
 ]
 
+def draw_lane_counters(screen):
+    font = pygame.font.Font(None, 20)
+    colors = {'top': (255, 255, 255), 'bottom': (255, 255, 255), 'left': (255, 255, 255), 'right': (255, 255, 255)}
+    positions = {'top': (50, 50), 'bottom': (50, height - 50), 'left': (50, 100), 'right': (width - 150, 100)}
+    for lane, count in lane_counters.items():
+        text_surface = font.render(f'{lane.capitalize()} Lane: {count}', True, colors[lane])
+        screen.blit(text_surface, positions[lane])
+
 # Frame rate
 clock = pygame.time.Clock()
 
@@ -76,18 +98,22 @@ def main():
     running = True
     # Initial traffic light status with orientation specified
     lights = [
-        {'pos': (width // 2 - 30, height // 2 - 120), 'red': False, 'yellow': False, 'green': False, 'vertical': True},
-        {'pos': (width // 2 - 30, height // 2 + 100), 'red': False, 'yellow': False, 'green': False, 'vertical': True},
-        {'pos': (width // 2 - 120, height // 2 - 30), 'red': False, 'yellow': True, 'green': False, 'vertical': False},
-        {'pos': (width // 2 + 100, height // 2 - 30), 'red': False, 'yellow': False, 'green': False, 'vertical': False}
+        {'pos': (width // 2 - 30, height // 2 - 120), 'red': False, 'yellow': False, 'green': True, 'vertical': True},
+        {'pos': (width // 2 - 30, height // 2 + 100), 'red': False, 'yellow': False, 'green': True, 'vertical': True},
+        {'pos': (width // 2 - 120, height // 2 - 30), 'red': False, 'yellow': True, 'green': True, 'vertical': False},
+        {'pos': (width // 2 + 100, height // 2 - 30), 'red': False, 'yellow': False, 'green': True, 'vertical': False}
     ]
 
+
     while running:
+        screen.fill(BLACK)
+
+        draw_lane_counters(screen)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-        screen.fill(BLACK)
         draw_road(screen)
 
         spawn_cars(cars, spawn_rate=0.05)  # Adjust spawn rate as needed
@@ -95,15 +121,27 @@ def main():
         manage_traffic_lights(cars, lights)
 
         # Check and remove out-of-bounds cars, then draw remaining cars
-        for car in cars[:]:  # Iterate over a copy of the list
+        for car in cars[:]:
             car.move()
             if car.is_out_of_bounds(width, height):
+                if car.direction == 'vertical':
+                    if car.speed > 0:
+                        lane_counters['top'] -= 1
+                    else:
+                        lane_counters['bottom'] -= 1
+                else:
+                    if car.speed > 0:
+                        lane_counters['left'] -= 1
+                    else:
+                        lane_counters['right'] -= 1
                 cars.remove(car)
             else:
                 car.draw(screen)
+
         for light in lights:
             draw_traffic_light(screen, light['pos'], light['red'], light['yellow'], light['green'], light.get('vertical', False))
-        
+        # light['green'] = random.choice([True, False])
+        # light['green'] = True
         pygame.display.flip()
         clock.tick(FPS)
 
