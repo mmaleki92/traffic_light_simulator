@@ -1,3 +1,8 @@
+"""
+Morteza Maleki
+github: mmaleki92
+"""
+
 import pygame
 import sys
 from settings import FPS, BLACK, width, height
