@@ -3,6 +3,14 @@ import requests
 # URL of the FastAPI server
 BASE_URL = "http://127.0.0.1:8000"
 
+def get_accident_status():
+    response = requests.get(f"{BASE_URL}/check-accident")
+    if response.status_code == 200:
+        accident_info = response.json()
+        print("Accident status:", "Yes" if accident_info["is_accident"] else "No")
+    else:
+        print("Failed to check accident status.")
+
 def get_lane_counters():
     response = requests.get(f"{BASE_URL}/lane-counters")
     if response.status_code == 200:
@@ -99,7 +107,7 @@ def main():
         
         elif choice == '5':
             # message = input("Enter accident message: ")
-            log_accident()
+            get_accident_status()
             # if log_accident():
             #     print("Accident logged successfully")
             # else:

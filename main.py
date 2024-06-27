@@ -173,6 +173,8 @@ def main():
         traffic_lights = fetch_traffic_lights()
 
         if check_for_accidents(traffic_lights):
+            response = requests.post(f"{BASE_URL}/log_accident", json={"is_accident":True})
+
             log_accident(True, "Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
 
         for car in cars[:]:

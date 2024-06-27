@@ -63,11 +63,19 @@ def update_traffic_lights(light_status: LightStatus):
 @app.post("/log-accident")
 def log_accident(accident: AccidentLog):
     accident_logs.append(accident.message)
-    return {"message": "Accident logged successfully", "is_accident": accident.is_accident}
+    print()
+    return {"message": "Accident logged successfully", "accident.is_accident": accident.is_accident}
 
 @app.get("/accident-logs")
 def get_accident_logs():
     return accident_logs
+
+@app.get("/check-accident")
+def check_accident():
+    horizontal_green = any(light['green'] for light in traffic_lights if light['direction'] in ['left', 'right'])
+    vertical_green = any(light['green'] for light in traffic_lights if light['direction'] in ['up', 'down'])
+    is_accident = horizontal_green and vertical_green
+    return {"is_accident": is_accident}
 
 if __name__ == "__main__":
     import uvicorn
