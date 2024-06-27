@@ -73,25 +73,26 @@ def spawn_cars(cars, spawn_rate=0.1):
         print(f"Added car: {direction} at: {lane_position} with speed {speed}")
 
 def manage_traffic_lights(cars, lights):
+    stop_distance = 50  # Adjust this distance as needed
     for car in cars:
         car.moving = True  # Assume the car can move unless a light says otherwise
         for light in lights:
             if car.direction == 'horizontal' and car.spawn_direction in ['left-right', 'right-left']:
                 if car.spawn_direction == 'left-right' and light['direction'] == 'left':
-                    if not light['green'] and light['pos'][0] - 150 <= car.rect.right < light['pos'][0] + 150:
+                    if not light['green'] and light['pos'][0] - stop_distance <= car.rect.right < light['pos'][0] + stop_distance:
                         car.moving = False
                         break
                 elif car.spawn_direction == 'right-left' and light['direction'] == 'right':
-                    if not light['green'] and light['pos'][0] - 150 <= car.rect.right < light['pos'][0] + 150:
+                    if not light['green'] and light['pos'][0] - stop_distance <= car.rect.left < light['pos'][0] + stop_distance:
                         car.moving = False
                         break
             elif car.direction == 'vertical' and car.spawn_direction in ['up-down', 'down-up']:
                 if car.spawn_direction == 'up-down' and light['direction'] == 'up':
-                    if not light['green'] and light['pos'][1] - 150 <= car.rect.bottom < light['pos'][1] + 150:
+                    if not light['green'] and light['pos'][1] - stop_distance <= car.rect.bottom < light['pos'][1] + stop_distance:
                         car.moving = False
                         break
                 elif car.spawn_direction == 'down-up' and light['direction'] == 'down':
-                    if not light['green'] and light['pos'][1] - 150 <= car.rect.bottom < light['pos'][1] + 150:
+                    if not light['green'] and light['pos'][1] - stop_distance <= car.rect.top < light['pos'][1] + stop_distance:
                         car.moving = False
                         break
 cars = []
@@ -110,10 +111,10 @@ def main():
     running = True
     # Initial traffic light status with orientation specified
     lights = [
-        {'pos': (width // 2 - 30, height // 2 - 120), 'red': False, 'yellow': False, 'green': True, 'direction': 'up'},
+        {'pos': (width // 2 - 30, height // 2 - 120), 'red': True, 'yellow': False, 'green': False, 'direction': 'up'},
         {'pos': (width // 2 - 30, height // 2 + 100), 'red': True, 'yellow': False, 'green': False, 'direction': 'down'},
-        {'pos': (width // 2 - 120, height // 2 - 30), 'red': False, 'yellow': True, 'green': True, 'direction': 'left'},
-        {'pos': (width // 2 + 100, height // 2 - 30), 'red': False, 'yellow': False, 'green': True, 'direction': 'right'}
+        {'pos': (width // 2 - 120, height // 2 - 30), 'red': True, 'yellow': True, 'green': False, 'direction': 'left'},
+        {'pos': (width // 2 + 100, height // 2 - 30), 'red': True, 'yellow': False, 'green': False, 'direction': 'right'}
     ]
 
     while running:
