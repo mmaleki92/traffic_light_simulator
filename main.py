@@ -8,9 +8,15 @@ import sys
 from settings import FPS, BLACK, width, height
 from draw_objects import draw_road, draw_traffic_light, Car
 import random
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
 
 # Initialize Pygame
 pygame.init()
+# Initialize FastAPI
+app = FastAPI()
+
 # Initialize lane counters for each direction
 lane_counters = {
     'top': 0,
@@ -19,9 +25,34 @@ lane_counters = {
     'right': 0
 }
 
+class LightStatus(BaseModel):
+    direction: str
+    red: bool
+    yellow: bool
+    green: bool
+
 # Set up the display
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Crossroad Simulation")
+
+
+
+@app.get("/cars")
+def get_cars():
+    return lane_counters
+
+@app.get("/lights")
+def get_lights():
+    return lights
+
+@app.post("/change_light")
+def change_light(status: LightStatus):
+    for light in lights:
+        if light['direction'] == status.direction:
+            light['red'] = status.red
+            light['yellow'] = status.yellow
+            light['green'] = status.green
+    return {"message": "Light status updated"}
 
 
 
@@ -158,4 +189,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Run the Pygame simulation in a separate thread
+    import threading
+    simulation_thread = threading.Thread(target=main)
+    simulation_thread.start()
+
+    # Run the FastAPI app
+    uvicorn.run(app, host="0.0.0.0", port=8000)
