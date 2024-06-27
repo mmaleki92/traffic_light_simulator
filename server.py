@@ -12,7 +12,13 @@ lane_counters = {
     'right': 0
 }
 
-
+# Initial traffic light status with orientation specified
+# traffic_lights = [
+#     {'id': 1, 'pos': (width // 2 - 30, height // 2 - 120), 'red': True, 'yellow': False, 'green': False, 'direction': 'up'},
+#     {'id': 2, 'pos': (width // 2 - 30, height // 2 + 100), 'red': True, 'yellow': False, 'green': False, 'direction': 'down'},
+#     {'id': 3, 'pos': (width // 2 - 120, height // 2 - 30), 'red': True, 'yellow': True, 'green': False, 'direction': 'left'},
+#     {'id': 4, 'pos': (width // 2 + 100, height // 2 - 30), 'red': True, 'yellow': False, 'green': False, 'direction': 'right'}
+# ]
 
 class LightStatus(BaseModel):
     id: int
@@ -25,6 +31,12 @@ class LaneCounter(BaseModel):
     bottom: int
     left: int
     right: int
+
+class AccidentLog(BaseModel):
+    message: str
+    is_accident: bool
+
+accident_logs = []
 
 @app.get("/lane-counters", response_model=LaneCounter)
 def get_lane_counters():
@@ -47,6 +59,15 @@ def update_traffic_lights(light_status: LightStatus):
             light['yellow'] = light_status.yellow
             light['green'] = light_status.green
     return traffic_lights
+
+@app.post("/log-accident")
+def log_accident(accident: AccidentLog):
+    accident_logs.append(accident.message)
+    return {"message": "Accident logged successfully", "is_accident": accident.is_accident}
+
+@app.get("/accident-logs")
+def get_accident_logs():
+    return accident_logs
 
 if __name__ == "__main__":
     import uvicorn

@@ -37,13 +37,27 @@ def update_traffic_light(light_id, red, yellow, green):
     print(f"Failed to update traffic light: {response.status_code}")
     return None
 
+def log_accident():
+    try:
+        # response = requests.post(f"{BASE_URL}/log-accident", json={"message": message})
+        response = requests.get(f"{BASE_URL}/log-accident")
+        if response.status_code == 200:
+
+            print(response.json())
+            print("Accident logged successfully")
+            return True
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to log accident: {e}")
+    return False
+
 def main():
     while True:
         print("1. Get lane counters")
         print("2. Update lane counters")
         print("3. Get traffic lights")
         print("4. Update traffic light")
-        print("5. Exit")
+        print("5. Log accident")
+        print("6. Exit")
         choice = input("Enter your choice: ")
 
         if choice == '1':
@@ -84,6 +98,14 @@ def main():
                     print(f"Light {light['id']} - Position: {light['pos']}, Red: {light['red']}, Yellow: {light['yellow']}, Green: {light['green']}, Direction: {light['direction']}")
         
         elif choice == '5':
+            # message = input("Enter accident message: ")
+            log_accident()
+            # if log_accident():
+            #     print("Accident logged successfully")
+            # else:
+            #     print("Failed to log accident")
+        
+        elif choice == '6':
             break
         
         else:

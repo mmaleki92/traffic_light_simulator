@@ -22,7 +22,6 @@ lane_counters = {
     'right': 0
 }
 
-
 def fetch_lane_counters():
     try:
         response = requests.get(f"{BASE_URL}/lane-counters")
@@ -55,6 +54,14 @@ def update_traffic_light(light_status):
         return response.status_code == 200
     except requests.exceptions.RequestException as e:
         print(f"Failed to update traffic light: {e}")
+    return False
+
+def log_accident(is_accident, message):
+    try:
+        response = requests.post(f"{BASE_URL}/log-accident", json={"message": message, "is_accident": is_accident})
+        return response.status_code == 200
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to log accident: {e}")
     return False
 
 def spawn_cars(cars, spawn_rate=0.1):
@@ -135,8 +142,7 @@ def draw_lane_counters(screen):
 def check_for_accidents(lights):
     horizontal_green = any(light['green'] for light in lights if light['direction'] in ['left', 'right'])
     vertical_green = any(light['green'] for light in lights if light['direction'] in ['up', 'down'])
-    if horizontal_green and vertical_green:
-        print("Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
+    return horizontal_green and vertical_green
 
 # Frame rate
 clock = pygame.time.Clock()
@@ -166,7 +172,8 @@ def main():
         # Fetch the updated traffic lights from the server
         traffic_lights = fetch_traffic_lights()
 
-        check_for_accidents(traffic_lights)
+        if check_for_accidents(traffic_lights):
+            log_accident(True, "Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
 
         for car in cars[:]:
             car.move()
