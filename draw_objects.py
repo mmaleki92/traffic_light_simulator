@@ -1,11 +1,11 @@
 import pygame
 from settings import *
-
 class Car:
-    def __init__(self, x, y, color, speed, direction='horizontal'):
+    def __init__(self, x, y, color, speed, direction='horizontal', spawn_direction='left-right'):
         self.color = color
         self.speed = speed
         self.direction = direction
+        self.spawn_direction = spawn_direction  # New attribute for spawn direction
         self.moving = True
         if direction == 'horizontal':
             self.rect = pygame.Rect(x, y, 30, 15)
@@ -15,9 +15,9 @@ class Car:
     def move(self):
         if self.moving:
             if self.direction == 'horizontal':
-                self.rect.x += self.speed  # Moves right
+                self.rect.x += self.speed  # Moves right or left
             elif self.direction == 'vertical':
-                self.rect.y += self.speed  # Moves down
+                self.rect.y += self.speed  # Moves up or down
 
     def draw(self, screen):
         pygame.draw.rect(screen, self.color, self.rect)
@@ -61,8 +61,12 @@ def draw_road(screen):
     # draw_arrow(screen, WHITE, (3 * width // 4 + 30, height // 2 + lane_width), (3 * width // 4, height // 2 + lane_width))  # Right
     # draw_arrow(screen, WHITE, (width // 4 - 30, height // 2 + lane_width), (width // 4, height // 2 + lane_width))  # Left opposite lane
     # draw_arrow(screen, WHITE, (3 * width // 4, height // 2 - lane_width), (3 * width // 4 + 30, height // 2 - lane_width))  # Right opposite lane
-def draw_traffic_light(surface, pos, red_on, yellow_on, green_on, vertical=False):
-    light_width, light_height = (20, 60) if not vertical else (60, 20)
+def draw_traffic_light(surface, pos, red_on, yellow_on, green_on, direction):
+    if direction not in ['left', 'right']:
+        light_width, light_height = 60, 20  # Horizontal layout
+    else:
+        light_width, light_height = 20, 60  # Vertical layout
+
     padding = 3
     circle_radius = 6
     black = (0, 0, 0)
@@ -76,7 +80,7 @@ def draw_traffic_light(surface, pos, red_on, yellow_on, green_on, vertical=False
     pygame.draw.rect(surface, black, light_rect)
 
     # Calculate and draw the traffic light circles
-    if vertical:
+    if direction not in ['left', 'right']:
         # Horizontal layout
         start_x = pos[0] + padding + circle_radius
         y = pos[1] + light_height // 2
