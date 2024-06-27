@@ -1,23 +1,20 @@
-"""
-Morteza Maleki
-github: mmaleki92
-"""
-
+import requests
 import pygame
 import sys
 from settings import FPS, BLACK, width, height
 from draw_objects import draw_road, draw_traffic_light, Car
 import random
-from fastapi import FastAPI
-from pydantic import BaseModel
-import uvicorn
 
 # Initialize Pygame
 pygame.init()
-# Initialize FastAPI
-app = FastAPI()
 
-# Initialize lane counters for each direction
+# Set up the display
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Crossroad Simulation")
+
+# URL of the FastAPI server
+BASE_URL = "http://127.0.0.1:8000"
+
 lane_counters = {
     'top': 0,
     'bottom': 0,
@@ -25,88 +22,94 @@ lane_counters = {
     'right': 0
 }
 
-class LightStatus(BaseModel):
-    direction: str
-    red: bool
-    yellow: bool
-    green: bool
+traffic_lights = [
+    {'pos': (width // 2 - 30, height // 2 - 120), 'red': True, 'yellow': False, 'green': False, 'direction': 'up'},
+    {'pos': (width // 2 - 30, height // 2 + 100), 'red': True, 'yellow': False, 'green': False, 'direction': 'down'},
+    {'pos': (width // 2 - 120, height // 2 - 30), 'red': True, 'yellow': True, 'green': False, 'direction': 'left'},
+    {'pos': (width // 2 + 100, height // 2 - 30), 'red': True, 'yellow': False, 'green': False, 'direction': 'right'}
+]
 
-# Set up the display
-screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption("Crossroad Simulation")
+def fetch_lane_counters():
+    try:
+        response = requests.get(f"{BASE_URL}/lane-counters")
+        if response.status_code == 200:
+            return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch lane counters: {e}")
+    return lane_counters  # Return the current lane_counters if the server is not available
 
+def update_lane_counters(counters):
+    try:
+        response = requests.post(f"{BASE_URL}/lane-counters", json=counters)
+        return response.status_code == 200
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to update lane counters: {e}")
+    return False
 
+def fetch_traffic_lights():
+    try:
+        response = requests.get(f"{BASE_URL}/traffic-lights")
+        if response.status_code == 200:
+            return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch traffic lights: {e}")
+    return traffic_lights  # Return the initialized traffic_lights if the server is not available
 
-@app.get("/cars")
-def get_cars():
-    return lane_counters
-
-@app.get("/lights")
-def get_lights():
-    return lights
-
-@app.post("/change_light")
-def change_light(status: LightStatus):
-    for light in lights:
-        if light['direction'] == status.direction:
-            light['red'] = status.red
-            light['yellow'] = status.yellow
-            light['green'] = status.green
-    return {"message": "Light status updated"}
-
-
+def update_traffic_light(light_status):
+    try:
+        response = requests.post(f"{BASE_URL}/traffic-lights", json=light_status)
+        return response.status_code == 200
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to update traffic light: {e}")
+    return False
 
 def spawn_cars(cars, spawn_rate=0.1):
+    global lane_counters  # Ensure we use the global lane_counters
     if random.random() < spawn_rate:
         direction = random.choice(['up-down', 'down-up', 'left-right', 'right-left'])
         road_width = 100
         lane_width = road_width // 2
         
         if direction in ['up-down', 'down-up']:
-            # Base lane position is the center of each lane
             lane_base_left = width // 2 - lane_width
             lane_base_right = width // 2 + lane_width
             if direction == 'up-down':
-                # Spawning from top, use left lane
                 y_position = -30
                 speed = 2
-                lane_position = lane_base_left + lane_width // 2  # Adjusted for the left lane
+                lane_position = lane_base_left + lane_width // 2
                 lane_counters['top'] += 1
             else:
-                # Spawning from bottom, use right lane
                 y_position = height + 30
                 speed = -2
-                lane_position = lane_base_right - lane_width // 2  # Adjusted for the right lane
+                lane_position = lane_base_right - lane_width // 2
                 lane_counters['bottom'] += 1
 
             car = Car(lane_position, y_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'vertical', direction)
         
         else:
-            # Base lane position is the center of each lane
             lane_base_top = height // 2 - lane_width
             lane_base_bottom = height // 2 + lane_width
             if direction == 'left-right':
-                # Spawning from left, use bottom lane
                 x_position = -30
                 speed = 2
-                lane_position = lane_base_bottom - lane_width // 2  # Adjusted for the bottom lane
+                lane_position = lane_base_bottom - lane_width // 2
                 lane_counters['left'] += 1
             else:
-                # Spawning from right, use top lane
                 x_position = width + 30
                 speed = -2
-                lane_position = lane_base_top + lane_width // 2  # Adjusted for the top lane
+                lane_position = lane_base_top + lane_width // 2
                 lane_counters['right'] += 1
 
             car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal', direction)
 
         cars.append(car)
+        update_lane_counters(lane_counters)
         print(f"Added car: {direction} at: {lane_position} with speed {speed}")
 
 def manage_traffic_lights(cars, lights):
-    stop_distance = 50  # Adjust this distance as needed
+    stop_distance = 50
     for car in cars:
-        car.moving = True  # Assume the car can move unless a light says otherwise
+        car.moving = True
         for light in lights:
             if car.direction == 'horizontal' and car.spawn_direction in ['left-right', 'right-left']:
                 if car.spawn_direction == 'left-right' and light['direction'] == 'left':
@@ -126,7 +129,6 @@ def manage_traffic_lights(cars, lights):
                     if not light['green'] and light['pos'][1] - stop_distance <= car.rect.top < light['pos'][1] + stop_distance:
                         car.moving = False
                         break
-cars = []
 
 def draw_lane_counters(screen):
     font = pygame.font.Font(None, 20)
@@ -138,16 +140,14 @@ def draw_lane_counters(screen):
 
 # Frame rate
 clock = pygame.time.Clock()
-def main():
-    running = True
-    # Initial traffic light status with orientation specified
-    lights = [
-        {'pos': (width // 2 - 30, height // 2 - 120), 'red': True, 'yellow': False, 'green': False, 'direction': 'up'},
-        {'pos': (width // 2 - 30, height // 2 + 100), 'red': True, 'yellow': False, 'green': False, 'direction': 'down'},
-        {'pos': (width // 2 - 120, height // 2 - 30), 'red': True, 'yellow': True, 'green': False, 'direction': 'left'},
-        {'pos': (width // 2 + 100, height // 2 - 30), 'red': True, 'yellow': False, 'green': False, 'direction': 'right'}
-    ]
 
+def main():
+    global lane_counters  # Ensure we use the global lane_counters
+    global traffic_lights  # Ensure we use the global traffic_lights
+    running = True
+    lane_counters.update(fetch_lane_counters())
+    traffic_lights = fetch_traffic_lights()
+    
     while running:
         screen.fill(BLACK)
 
@@ -159,11 +159,10 @@ def main():
 
         draw_road(screen)
 
-        spawn_cars(cars, spawn_rate=0.05)  # Adjust spawn rate as needed
+        spawn_cars(cars, spawn_rate=0.05)
 
-        manage_traffic_lights(cars, lights)
+        manage_traffic_lights(cars, traffic_lights)
 
-        # Check and remove out-of-bounds cars, then draw remaining cars
         for car in cars[:]:
             car.move()
             if car.is_out_of_bounds(width, height):
@@ -178,21 +177,16 @@ def main():
                     else:
                         lane_counters['right'] -= 1
                 cars.remove(car)
+                update_lane_counters(lane_counters)
             else:
                 car.draw(screen)
 
-        for light in lights:
+        for light in traffic_lights:
             draw_traffic_light(screen, light['pos'], light['red'], light['yellow'], light['green'], light['direction'])
-        
+
         pygame.display.flip()
         clock.tick(FPS)
 
-
 if __name__ == '__main__':
-    # Run the Pygame simulation in a separate thread
-    import threading
-    simulation_thread = threading.Thread(target=main)
-    simulation_thread.start()
-
-    # Run the FastAPI app
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    cars = []
+    main()
