@@ -1,7 +1,7 @@
 import requests
 import pygame
 import sys
-from settings import FPS, BLACK, width, height
+from settings import FPS, BLACK, width, height, traffic_lights
 from draw_objects import draw_road, draw_traffic_light, Car
 import random
 
@@ -22,12 +22,6 @@ lane_counters = {
     'right': 0
 }
 
-traffic_lights = [
-    {'pos': (width // 2 - 30, height // 2 - 120), 'red': True, 'yellow': False, 'green': False, 'direction': 'up'},
-    {'pos': (width // 2 - 30, height // 2 + 100), 'red': True, 'yellow': False, 'green': False, 'direction': 'down'},
-    {'pos': (width // 2 - 120, height // 2 - 30), 'red': True, 'yellow': True, 'green': False, 'direction': 'left'},
-    {'pos': (width // 2 + 100, height // 2 - 30), 'red': True, 'yellow': False, 'green': False, 'direction': 'right'}
-]
 
 def fetch_lane_counters():
     try:
@@ -138,6 +132,12 @@ def draw_lane_counters(screen):
         text_surface = font.render(f'{lane.capitalize()} Lane: {count}', True, colors[lane])
         screen.blit(text_surface, positions[lane])
 
+def check_for_accidents(lights):
+    horizontal_green = any(light['green'] for light in lights if light['direction'] in ['left', 'right'])
+    vertical_green = any(light['green'] for light in lights if light['direction'] in ['up', 'down'])
+    if horizontal_green and vertical_green:
+        print("Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
+
 # Frame rate
 clock = pygame.time.Clock()
 
@@ -162,6 +162,11 @@ def main():
         spawn_cars(cars, spawn_rate=0.05)
 
         manage_traffic_lights(cars, traffic_lights)
+
+        # Fetch the updated traffic lights from the server
+        traffic_lights = fetch_traffic_lights()
+
+        check_for_accidents(traffic_lights)
 
         for car in cars[:]:
             car.move()

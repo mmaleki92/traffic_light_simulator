@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from settings import width, height
+from settings import width, height, traffic_lights
+
 app = FastAPI()
 
 # Initial lane counters for each direction
@@ -10,22 +11,6 @@ lane_counters = {
     'left': 0,
     'right': 0
 }
-
-# # Initial traffic light statuses
-# traffic_lights = [
-#     {'id': 1, 'pos': (400 - 30, 300 - 120), 'red': True, 'yellow': False, 'green': False, 'direction': 'up'},
-#     {'id': 2, 'pos': (400 - 30, 300 + 100), 'red': True, 'yellow': False, 'green': False, 'direction': 'down'},
-#     {'id': 3, 'pos': (400 - 120, 300 - 30), 'red': True, 'yellow': True, 'green': False, 'direction': 'left'},
-#     {'id': 4, 'pos': (400 + 100, 300 - 30), 'red': True, 'yellow': False, 'green': False, 'direction': 'right'}
-# ]
-
-# Initial traffic light status with orientation specified
-traffic_lights = [
-    {'pos': (width // 2 - 30, height // 2 - 120), 'red': True, 'yellow': False, 'green': False, 'direction': 'up'},
-    {'pos': (width // 2 - 30, height // 2 + 100), 'red': True, 'yellow': False, 'green': False, 'direction': 'down'},
-    {'pos': (width // 2 - 120, height // 2 - 30), 'red': True, 'yellow': True, 'green': False, 'direction': 'left'},
-    {'pos': (width // 2 + 100, height // 2 - 30), 'red': True, 'yellow': False, 'green': False, 'direction': 'right'}
-]
 
 
 
@@ -54,7 +39,7 @@ def update_lane_counters(counters: LaneCounter):
 def get_traffic_lights():
     return traffic_lights
 
-@app.post("/traffic-lights")
+@app.post("/traffic-lights", response_model=list)
 def update_traffic_lights(light_status: LightStatus):
     for light in traffic_lights:
         if light['id'] == light_status.id:
