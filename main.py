@@ -180,7 +180,11 @@ def main():
         if check_for_accidents(traffic_lights):
             log_accident(True, "Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
         
-        cars.update()  # Move all cars
+        # cars.update()  # Move all cars
+        
+        for car in cars:
+            car.update(cars)
+        
         for car in cars:
             if car.is_out_of_bounds(width, height):
                 update_lane_counters(lane_counters)

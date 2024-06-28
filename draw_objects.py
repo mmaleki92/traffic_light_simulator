@@ -20,16 +20,27 @@ class Car(pygame.sprite.Sprite):
         self.image.fill(color)
         self.rect = self.image.get_rect(topleft=(x, y))
 
-    def update(self):
+    def update(self, cars):
         if self.moving:
+            original_position = self.rect.copy()
+
+            # Move the car
             if self.direction == 'horizontal':
                 self.rect.x += self.speed
             elif self.direction == 'vertical':
                 self.rect.y += self.speed
-        
-        # Use the specific out-of-bounds method
-        if self.is_out_of_bounds(width, height):
-            self.kill()
+            
+            # Check for collision, ignoring self
+            def collided_except_self(sprite, group):
+                return [s for s in group if s != sprite and pygame.sprite.collide_rect(sprite, s)]
+
+            collision_sprites = collided_except_self(self, cars)
+            if collision_sprites:
+                self.rect = original_position  # Revert to the original position if collision
+            
+            # Check bounds
+            if self.is_out_of_bounds(width, height):
+                self.kill()
 
     def is_out_of_bounds(self, width, height):
         # Defines conditions under which the car is considered out of bounds
