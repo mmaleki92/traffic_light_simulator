@@ -68,12 +68,15 @@ def spawn_cars(cars, spawn_rate=0.1):
     global lane_counters  # Ensure we use the global lane_counters
     if random.random() < spawn_rate:
         direction = random.choice(['up-down', 'down-up', 'left-right', 'right-left'])
-        road_width = 100
-        lane_width = road_width // 2
+        road_width = 200  # Increased to accommodate 4 lanes in total, 2 per direction
+        lane_width = road_width // 4  # 4 lanes, each lane has a width of road_width/4
         
         if direction in ['up-down', 'down-up']:
-            lane_base_left = width // 2 - lane_width
-            lane_base_right = width // 2 + lane_width
+            # Choose a random lane among the two available for the direction
+            lane_number = random.choice([1, 2])  # 1 or 2 for top and bottom lanes
+            lane_base_left = width // 2 - road_width // 2 + lane_width * (lane_number - 1)
+            lane_base_right = width // 2 + road_width // 2 - lane_width * lane_number
+            
             if direction == 'up-down':
                 y_position = -30
                 speed = 2
@@ -82,18 +85,21 @@ def spawn_cars(cars, spawn_rate=0.1):
             else:
                 y_position = height + 30
                 speed = -2
-                lane_position = lane_base_right - lane_width // 2
+                lane_position = lane_base_right + lane_width // 2
                 lane_counters['bottom'] += 1
 
             car = Car(lane_position, y_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'vertical', direction)
         
         else:
-            lane_base_top = height // 2 - lane_width
-            lane_base_bottom = height // 2 + lane_width
+            # Choose a random lane among the two available for the direction
+            lane_number = random.choice([1, 2])  # 1 or 2 for left and right lanes
+            lane_base_top = height // 2 - road_width // 2 + lane_width * (lane_number - 1)
+            lane_base_bottom = height // 2 + road_width // 2 - lane_width * lane_number
+            
             if direction == 'left-right':
                 x_position = -30
                 speed = 2
-                lane_position = lane_base_bottom - lane_width // 2
+                lane_position = lane_base_bottom + lane_width // 2
                 lane_counters['left'] += 1
             else:
                 x_position = width + 30
