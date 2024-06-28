@@ -64,6 +64,7 @@ def log_accident(is_accident, message):
         print(f"Failed to log accident: {e}")
     return False
 
+
 def spawn_cars(cars, spawn_rate=0.1):
     global lane_counters  # Ensure we use the global lane_counters
     if random.random() < spawn_rate:
@@ -109,7 +110,7 @@ def spawn_cars(cars, spawn_rate=0.1):
 
             car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal', direction)
 
-        cars.append(car)
+        cars.add(car)  # Use add() instead of append()
         update_lane_counters(lane_counters)
         print(f"Added car: {direction} at: {lane_position} with speed {speed}")
 
@@ -154,15 +155,15 @@ def check_for_accidents(lights):
 clock = pygame.time.Clock()
 
 def main():
-    global lane_counters  # Ensure we use the global lane_counters
-    global traffic_lights  # Ensure we use the global traffic_lights
+    global lane_counters  # Use the global counters
+    global traffic_lights  # And the global traffic light settings
     running = True
+    cars = pygame.sprite.Group()  # This will hold all car sprites
     lane_counters.update(fetch_lane_counters())
     traffic_lights = fetch_traffic_lights()
-    
+
     while running:
         screen.fill(BLACK)
-
         draw_lane_counters(screen)
 
         for event in pygame.event.get():
@@ -170,43 +171,28 @@ def main():
                 running = False
 
         draw_road(screen)
-
         spawn_cars(cars, spawn_rate=0.05)
+        print(f"Total cars: {len(cars)}")  # Debugging print
 
         manage_traffic_lights(cars, traffic_lights)
-
-        # Fetch the updated traffic lights from the server
         traffic_lights = fetch_traffic_lights()
 
         if check_for_accidents(traffic_lights):
-            response = requests.post(f"{BASE_URL}/log_accident", json={"is_accident":True})
-
             log_accident(True, "Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
-
-        for car in cars[:]:
-            car.move()
+        
+        cars.update()  # Move all cars
+        for car in cars:
             if car.is_out_of_bounds(width, height):
-                if car.direction == 'vertical':
-                    if car.speed > 0:
-                        lane_counters['top'] -= 1
-                    else:
-                        lane_counters['bottom'] -= 1
-                else:
-                    if car.speed > 0:
-                        lane_counters['left'] -= 1
-                    else:
-                        lane_counters['right'] -= 1
-                cars.remove(car)
                 update_lane_counters(lane_counters)
-            else:
-                car.draw(screen)
+                cars.remove(car)  # Remove the car if it is out of bounds
+                print(f"Car removed: Remaining cars: {len(cars)}")  # Debugging print
 
+        cars.draw(screen)
         for light in traffic_lights:
             draw_traffic_light(screen, light['pos'], light['red'], light['yellow'], light['green'], light['direction'])
-
+        
         pygame.display.flip()
         clock.tick(FPS)
 
 if __name__ == '__main__':
-    cars = []
     main()

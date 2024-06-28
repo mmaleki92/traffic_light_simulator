@@ -1,38 +1,52 @@
 import pygame
 from settings import *
-class Car:
+
+
+class Car(pygame.sprite.Sprite):
     def __init__(self, x, y, color, speed, direction='horizontal', spawn_direction='left-right'):
+        super().__init__()
         self.color = color
         self.speed = speed
         self.direction = direction
-        self.spawn_direction = spawn_direction  # New attribute for spawn direction
+        self.spawn_direction = spawn_direction
         self.moving = True
-        if direction == 'horizontal':
-            self.rect = pygame.Rect(x, y, 30, 15)
-        elif direction == 'vertical':
-            self.rect = pygame.Rect(x, y, 15, 30)  # Adjusted for vertical orientation
 
-    def move(self):
+        # Initialize the sprite
+        if direction == 'horizontal':
+            self.image = pygame.Surface((30, 15))
+        elif direction == 'vertical':
+            self.image = pygame.Surface((15, 30))
+        
+        self.image.fill(color)
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+    def update(self):
         if self.moving:
             if self.direction == 'horizontal':
-                self.rect.x += self.speed  # Moves right or left
+                self.rect.x += self.speed
             elif self.direction == 'vertical':
-                self.rect.y += self.speed  # Moves up or down
+                self.rect.y += self.speed
+        
+        # Use the specific out-of-bounds method
+        if self.is_out_of_bounds(width, height):
+            self.kill()
+
+    def is_out_of_bounds(self, width, height):
+        # Defines conditions under which the car is considered out of bounds
+        if self.direction == 'horizontal':
+            if self.speed > 0 and self.rect.left > width:  # Moving right
+                return True
+            elif self.speed < 0 and self.rect.right < 0:  # Moving left
+                return True
+        elif self.direction == 'vertical':
+            if self.speed > 0 and self.rect.top > height:  # Moving down
+                return True
+            elif self.speed < 0 and self.rect.bottom < 0:  # Moving up
+                return True
+        return False
 
     def draw(self, screen):
         pygame.draw.rect(screen, self.color, self.rect)
-
-    def is_out_of_bounds(self, width, height):
-        if self.direction == 'horizontal':
-            if self.speed > 0:  # Moving right
-                return self.rect.right > width
-            else:  # Moving left
-                return self.rect.left < 0
-        elif self.direction == 'vertical':
-            if self.speed > 0:  # Moving down
-                return self.rect.bottom > height
-            else:  # Moving up
-                return self.rect.top < 0
 
 def draw_road(screen):
     road_width = 100  # Increased road width
