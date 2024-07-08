@@ -13,9 +13,9 @@ class Car(pygame.sprite.Sprite):
 
         # Initialize the sprite
         if direction == 'horizontal':
-            self.image = pygame.Surface((30, 15))
+            self.image = pygame.Surface((20, 10))
         elif direction == 'vertical':
-            self.image = pygame.Surface((15, 30))
+            self.image = pygame.Surface((10, 20))
         
         self.image.fill(color)
         self.rect = self.image.get_rect(topleft=(x, y))

@@ -4,6 +4,8 @@ import sys
 from settings import FPS, BLACK, width, height, traffic_lights
 from draw_objects import draw_road, draw_traffic_light, Car
 import random
+import pygame
+import pytmx
 
 # Initialize Pygame
 pygame.init()
@@ -69,7 +71,7 @@ def spawn_cars(cars, spawn_rate=0.1):
     global lane_counters  # Ensure we use the global lane_counters
     if random.random() < spawn_rate:
         direction = random.choice(['up-down', 'down-up', 'left-right', 'right-left'])
-        road_width = 200  # Increased to accommodate 4 lanes in total, 2 per direction
+        road_width = 50  # Increased to accommodate 4 lanes in total, 2 per direction
         lane_width = road_width // 4  # 4 lanes, each lane has a width of road_width/4
         
         if direction in ['up-down', 'down-up']:
@@ -79,9 +81,9 @@ def spawn_cars(cars, spawn_rate=0.1):
             lane_base_right = width // 2 + road_width // 2 - lane_width * lane_number
             
             if direction == 'up-down':
-                y_position = -30
+                y_position = -20
                 speed = 2
-                lane_position = lane_base_left + lane_width // 2
+                lane_position = lane_base_left + lane_width // 2 - 14
                 lane_counters['top'] += 1
             else:
                 y_position = height + 30
@@ -90,7 +92,6 @@ def spawn_cars(cars, spawn_rate=0.1):
                 lane_counters['bottom'] += 1
 
             car = Car(lane_position, y_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'vertical', direction)
-        
         else:
             # Choose a random lane among the two available for the direction
             lane_number = random.choice([1, 2])  # 1 or 2 for left and right lanes
@@ -100,12 +101,12 @@ def spawn_cars(cars, spawn_rate=0.1):
             if direction == 'left-right':
                 x_position = -30
                 speed = 2
-                lane_position = lane_base_bottom + lane_width // 2
+                lane_position = lane_base_bottom + lane_width // 2 
                 lane_counters['left'] += 1
             else:
                 x_position = width + 30
                 speed = -2
-                lane_position = lane_base_top + lane_width // 2
+                lane_position = lane_base_top + lane_width // 2 -10
                 lane_counters['right'] += 1
 
             car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal', direction)
@@ -154,7 +155,39 @@ def check_for_accidents(lights):
 # Frame rate
 clock = pygame.time.Clock()
 
+
+def load_map(filename):
+    tmx_data = pytmx.util_pygame.load_pygame(filename)
+    return tmx_data
+
+def draw_map_surface(tmx_data, scale):
+    map_width = tmx_data.width * tmx_data.tilewidth
+    map_height = tmx_data.height * tmx_data.tileheight
+    
+    # Create a surface with the size of the entire map
+    map_surface = pygame.Surface((map_width, map_height), pygame.SRCALPHA)
+    
+    for layer in tmx_data.visible_layers:
+        if isinstance(layer, pytmx.TiledTileLayer):
+            for x, y, gid in layer:
+                tile = tmx_data.get_tile_image_by_gid(gid)
+                if tile:
+                    map_surface.blit(tile, (x * tmx_data.tilewidth, y * tmx_data.tileheight))
+    
+    # Scale the map surface
+    scaled_surface = pygame.transform.scale(map_surface, (int(map_width * scale), int(map_height * scale)))
+    
+    return scaled_surface
 def main():
+    tmx_data = load_map("map.tmx")
+    map_width = tmx_data.width * tmx_data.tilewidth
+    map_height = tmx_data.height * tmx_data.tileheight
+    
+    # Calculate scale factor to fit the map to the screen size
+    scale_x = width / map_width
+    scale_y = height / map_height
+    scale = min(scale_x, scale_y)  # Maintain aspect ratio by using the smaller scale factor
+    scaled_map_surface = draw_map_surface(tmx_data, scale)
     global lane_counters  # Use the global counters
     global traffic_lights  # And the global traffic light settings
     running = True
@@ -170,7 +203,7 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        draw_road(screen)
+        # draw_road(screen)
         spawn_cars(cars, spawn_rate=0.05)
         print(f"Total cars: {len(cars)}")  # Debugging print
 
@@ -190,13 +223,16 @@ def main():
                 update_lane_counters(lane_counters)
                 cars.remove(car)  # Remove the car if it is out of bounds
                 print(f"Car removed: Remaining cars: {len(cars)}")  # Debugging print
-
+    
+        screen.blit(scaled_map_surface, (0, 0))
         cars.draw(screen)
         for light in traffic_lights:
             draw_traffic_light(screen, light['pos'], light['red'], light['yellow'], light['green'], light['direction'])
         
         pygame.display.flip()
         clock.tick(FPS)
+
+
 
 if __name__ == '__main__':
     main()
