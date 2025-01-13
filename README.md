@@ -1,5 +1,7 @@
-Run the server:
+![control_traffic](https://github.com/user-attachments/assets/22ad184a-e852-415d-906d-09e47ce6e385)
 
+
+Run the server:
 ```bash
 python server.py
 ```
