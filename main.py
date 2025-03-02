@@ -6,6 +6,7 @@ from draw_objects import draw_road, draw_traffic_light, Car
 import random
 import pygame
 import pytmx
+import time
 
 # Initialize Pygame
 pygame.init()
@@ -33,13 +34,26 @@ spawn_timers = {
 }
 # Spawn intervals (in frames) for each direction
 spawn_intervals = {
-    'up-down': 60,  # Spawn a car every ~2 seconds (with 30 FPS)
+    'up-down': 60,
     'down-up': 70,
     'left-right': 65,
     'right-left': 75
 }
 # Maximum number of cars (set this to a reasonable number based on your system performance)
 MAX_CARS = 100
+
+# Define a larger simulation area that extends beyond the visible window
+# This will be used for car management outside the visible area
+simulation_bounds = {
+    'left': -200,
+    'right': width + 200,
+    'top': -200,
+    'bottom': height + 200
+}
+
+# Track the last time we did a cleanup of stalled cars
+last_cleanup_time = time.time()
+cleanup_interval = 5  # seconds between cleanup checks
 
 def fetch_lane_counters():
     try:
@@ -85,18 +99,25 @@ def log_accident(is_accident, message):
 
 
 def spawn_cars(cars):
-    global lane_counters, spawn_timers  # Use the global counters and timers
+    global lane_counters, spawn_timers
     
-    # Don't spawn more cars if we've reached the maximum
+    # If we're at capacity, don't attempt to spawn more cars
     if len(cars) >= MAX_CARS:
-        return
+        return 0  # Return 0 to indicate no cars were spawned
     
+    cars_spawned = 0
     # Update all spawn timers
     for direction in spawn_timers:
         spawn_timers[direction] += 1
     
+    # Calculate how many slots we have available
+    available_slots = MAX_CARS - len(cars)
+    
     # Try to spawn cars for each direction if timer is up
     for direction in spawn_timers:
+        if available_slots <= 0:
+            break  # Stop if we're at capacity
+            
         if spawn_timers[direction] >= spawn_intervals[direction]:
             spawn_timers[direction] = 0  # Reset the timer
             
@@ -111,12 +132,12 @@ def spawn_cars(cars):
                 lane_base_right = width // 2 + road_width // 2 - lane_width * lane_number
                 
                 if direction == 'up-down':
-                    y_position = -20
+                    y_position = simulation_bounds['top']  # Start above the visible area
                     speed = 2
                     lane_position = lane_base_left + lane_width // 2 - 14
                     lane_counters['top'] += 1
                 else:
-                    y_position = height + 30
+                    y_position = simulation_bounds['bottom']  # Start below the visible area
                     speed = -2
                     lane_position = lane_base_right + lane_width // 2
                     lane_counters['bottom'] += 1
@@ -129,12 +150,12 @@ def spawn_cars(cars):
                 lane_base_bottom = height // 2 + road_width // 2 - lane_width * lane_number
                 
                 if direction == 'left-right':
-                    x_position = -30
+                    x_position = simulation_bounds['left']  # Start to the left of the visible area
                     speed = 2
                     lane_position = lane_base_bottom + lane_width // 2 
                     lane_counters['left'] += 1
                 else:
-                    x_position = width + 30
+                    x_position = simulation_bounds['right']  # Start to the right of the visible area
                     speed = -2
                     lane_position = lane_base_top + lane_width // 2 -10
                     lane_counters['right'] += 1
@@ -142,32 +163,73 @@ def spawn_cars(cars):
                 car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal', direction)
 
             cars.add(car)  # Use add() instead of append()
+            cars_spawned += 1
+            available_slots -= 1
             update_lane_counters(lane_counters)
             print(f"Added car: {direction} at: {lane_position} with speed {speed}")
+    
+    return cars_spawned
 
 def manage_traffic_lights(cars, lights):
+    """
+    Manages how cars respond to traffic lights.
+    Updated to handle both visible and non-visible cars consistently.
+    """
+    # Create a dictionary to represent the traffic light state for each direction
+    light_states = {
+        'up': False,    # Green state for up direction
+        'down': False,  # Green state for down direction
+        'left': False,  # Green state for left direction
+        'right': False  # Green state for right direction
+    }
+    
+    # First, determine the state of each directional traffic light
+    for light in lights:
+        if light['green']:
+            light_states[light['direction']] = True
+    
+    # Use a fixed stop distance for all cars to be consistent
     stop_distance = 50
+    
+    # Apply the traffic light rules to all cars
     for car in cars:
+        # Initially assume the car can move
         car.moving = True
-        for light in lights:
-            if car.direction == 'horizontal' and car.spawn_direction in ['left-right', 'right-left']:
-                if car.spawn_direction == 'left-right' and light['direction'] == 'left':
-                    if not light['green'] and light['pos'][0] - stop_distance <= car.rect.right < light['pos'][0] + stop_distance:
-                        car.moving = False
-                        break
-                elif car.spawn_direction == 'right-left' and light['direction'] == 'right':
-                    if not light['green'] and light['pos'][0] - stop_distance <= car.rect.left < light['pos'][0] + stop_distance:
-                        car.moving = False
-                        break
-            elif car.direction == 'vertical' and car.spawn_direction in ['up-down', 'down-up']:
-                if car.spawn_direction == 'up-down' and light['direction'] == 'up':
-                    if not light['green'] and light['pos'][1] - stop_distance <= car.rect.bottom < light['pos'][1] + stop_distance:
-                        car.moving = False
-                        break
-                elif car.spawn_direction == 'down-up' and light['direction'] == 'down':
-                    if not light['green'] and light['pos'][1] - stop_distance <= car.rect.top < light['pos'][1] + stop_distance:
-                        car.moving = False
-                        break
+        
+        # Check if the car needs to stop based on traffic lights
+        if car.direction == 'horizontal':
+            if car.spawn_direction == 'left-right' and not light_states['left']:
+                # Calculate if car is approaching a red light
+                for light in lights:
+                    if light['direction'] == 'left':
+                        if light['pos'][0] - stop_distance <= car.rect.right < light['pos'][0] + stop_distance:
+                            car.moving = False
+                            break
+            
+            elif car.spawn_direction == 'right-left' and not light_states['right']:
+                # Calculate if car is approaching a red light
+                for light in lights:
+                    if light['direction'] == 'right':
+                        if light['pos'][0] - stop_distance <= car.rect.left < light['pos'][0] + stop_distance:
+                            car.moving = False
+                            break
+        
+        elif car.direction == 'vertical':
+            if car.spawn_direction == 'up-down' and not light_states['up']:
+                # Calculate if car is approaching a red light
+                for light in lights:
+                    if light['direction'] == 'up':
+                        if light['pos'][1] - stop_distance <= car.rect.bottom < light['pos'][1] + stop_distance:
+                            car.moving = False
+                            break
+            
+            elif car.spawn_direction == 'down-up' and not light_states['down']:
+                # Calculate if car is approaching a red light
+                for light in lights:
+                    if light['direction'] == 'down':
+                        if light['pos'][1] - stop_distance <= car.rect.top < light['pos'][1] + stop_distance:
+                            car.moving = False
+                            break
 
 def draw_lane_counters(screen):
     font = pygame.font.Font(None, 20)
@@ -182,9 +244,75 @@ def check_for_accidents(lights):
     vertical_green = any(light['green'] for light in lights if light['direction'] in ['up', 'down'])
     return horizontal_green and vertical_green
 
+def is_car_in_extended_bounds(car):
+    """
+    Check if a car is within our extended simulation bounds.
+    This allows cars to exist outside the visible window but still be simulated.
+    """
+    if car.direction == 'horizontal':
+        return simulation_bounds['left'] - 50 <= car.rect.x <= simulation_bounds['right'] + 50
+    else:  # vertical
+        return simulation_bounds['top'] - 50 <= car.rect.y <= simulation_bounds['bottom'] + 50
+
+def cleanup_stalled_cars(cars, lights):
+    """
+    Remove cars that have been stalled for too long to prevent gridlock.
+    This helps maintain car flow even when traffic lights cause congestion.
+    """
+    # Check if lights are green to avoid removing cars that are legitimately waiting
+    light_states = {
+        'up': False, 
+        'down': False, 
+        'left': False, 
+        'right': False
+    }
+    for light in lights:
+        if light['green']:
+            light_states[light['direction']] = True
+    
+    cars_to_remove = []
+    
+    # If we're at or near capacity, be more aggressive with cleanup
+    at_capacity = len(cars) >= MAX_CARS * 0.9
+    
+    for car in cars:
+        # If the car isn't moving but should be moving based on traffic lights, it might be stuck
+        if not car.moving:
+            if car.direction == 'horizontal':
+                if (car.spawn_direction == 'left-right' and light_states['left']) or \
+                   (car.spawn_direction == 'right-left' and light_states['right']):
+                    # The car should be moving but isn't
+                    cars_to_remove.append(car)
+            elif car.direction == 'vertical':
+                if (car.spawn_direction == 'up-down' and light_states['up']) or \
+                   (car.spawn_direction == 'down-up' and light_states['down']):
+                    # The car should be moving but isn't
+                    cars_to_remove.append(car)
+        
+        # Remove edge cases - cars that are really far out
+        if not is_car_in_extended_bounds(car):
+            cars_to_remove.append(car)
+        
+        # If we're at capacity, remove some off-screen cars to make room
+        if at_capacity and not car.rect.colliderect(pygame.Rect(0, 0, width, height)):
+            # Make sure we prefer to remove cars that are moving away from the intersection
+            if car.direction == 'horizontal':
+                if (car.spawn_direction == 'left-right' and car.rect.left > width/2) or \
+                   (car.spawn_direction == 'right-left' and car.rect.right < width/2):
+                    cars_to_remove.append(car)
+            elif car.direction == 'vertical':
+                if (car.spawn_direction == 'up-down' and car.rect.top > height/2) or \
+                   (car.spawn_direction == 'down-up' and car.rect.bottom < height/2):
+                    cars_to_remove.append(car)
+    
+    # Remove the cars we identified
+    for car in cars_to_remove:
+        if car in cars:  # Make sure the car is still in the group
+            cars.remove(car)
+            print(f"Removed car during cleanup. Remaining: {len(cars)}")
+
 # Frame rate
 clock = pygame.time.Clock()
-
 
 def load_map(filename):
     tmx_data = pytmx.util_pygame.load_pygame(filename)
@@ -210,6 +338,8 @@ def draw_map_surface(tmx_data, scale):
     return scaled_surface
 
 def main():
+    global last_cleanup_time
+    
     tmx_data = load_map("map.tmx")
     map_width = tmx_data.width * tmx_data.tilewidth
     map_height = tmx_data.height * tmx_data.tileheight
@@ -226,43 +356,102 @@ def main():
     lane_counters.update(fetch_lane_counters())
     traffic_lights = fetch_traffic_lights()
 
-    # Display stats
+    # Font for displaying stats
     font = pygame.font.Font(None, 24)
+    debug_mode = False  # Toggle for showing debug info
+    
+    # Track statistics
+    cars_spawned_this_frame = 0
+    cars_removed_this_frame = 0
 
     while running:
+        frame_start_car_count = len(cars)
+        cars_spawned_this_frame = 0
+        cars_removed_this_frame = 0
+        
         screen.fill(BLACK)
-        draw_lane_counters(screen)
-
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_d:  # Press 'D' to toggle debug mode
+                    debug_mode = not debug_mode
+                elif event.key == pygame.K_c:  # Press 'C' to force cleanup
+                    pre_cleanup_count = len(cars)
+                    cleanup_stalled_cars(cars, traffic_lights)
+                    post_cleanup_count = len(cars)
+                    print(f"Manual cleanup removed {pre_cleanup_count - post_cleanup_count} cars")
 
-        # Spawn cars with our new deterministic approach
-        spawn_cars(cars)
-        
-        # Display number of cars
-        cars_text = font.render(f"Cars: {len(cars)}/{MAX_CARS}", True, (255, 255, 255))
-        screen.blit(cars_text, (width - 150, 20))
-
-        manage_traffic_lights(cars, traffic_lights)
+        # Fetch latest traffic light states
         traffic_lights = fetch_traffic_lights()
-
+        
+        # Regular cleanup check on timer
+        current_time = time.time()
+        if current_time - last_cleanup_time >= cleanup_interval:
+            cleanup_stalled_cars(cars, traffic_lights)
+            last_cleanup_time = current_time
+        
+        # Spawn cars only if we're not at capacity
+        if len(cars) < MAX_CARS:
+            cars_spawned_this_frame = spawn_cars(cars)
+        
+        # Manage traffic lights for ALL cars
+        manage_traffic_lights(cars, traffic_lights)
+        
         if check_for_accidents(traffic_lights):
             log_accident(True, "Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
         
-        # Update all cars
-        for car in list(cars):  # Make a copy of the cars list for safe iteration
+        # Update ALL cars
+        starting_car_count = len(cars)
+        for car in list(cars):  # Make a copy for safe iteration
             car.update(cars)
             
-            # Check if car is out of bounds and remove if necessary
-            if car.is_out_of_bounds(width, height):
-                cars.remove(car)  # Remove the car if it is out of bounds
+            # Check if car is far outside our extended bounds
+            if not is_car_in_extended_bounds(car):
+                cars.remove(car)
+                cars_removed_this_frame += 1
         
-        # Draw the map and all the objects
+        # Calculate how many cars were removed during update
+        cars_removed_this_frame = starting_car_count - len(cars) + cars_spawned_this_frame
+    
+        # Draw the map
         screen.blit(scaled_map_surface, (0, 0))
-        cars.draw(screen)
+        
+        # Only draw cars that would be visible on screen for efficiency
+        for car in cars:
+            if car.rect.colliderect(pygame.Rect(0, 0, width, height)):
+                screen.blit(car.image, car.rect)
+        
+        # Draw traffic lights
         for light in traffic_lights:
             draw_traffic_light(screen, light['pos'], light['red'], light['yellow'], light['green'], light['direction'])
+        
+        # Display lane counters and stats
+        draw_lane_counters(screen)
+        
+        # Always show car count
+        cars_text = font.render(f"Cars: {len(cars)}/{MAX_CARS}", True, (255, 255, 255))
+        screen.blit(cars_text, (width - 150, 20))
+        
+        # Debug information if enabled
+        if debug_mode:
+            visible_cars = sum(1 for car in cars if car.rect.colliderect(pygame.Rect(0, 0, width, height)))
+            moving_cars = sum(1 for car in cars if car.moving)
+            
+            debug_text = [
+                f"FPS: {int(clock.get_fps())}",
+                f"Visible cars: {visible_cars}",
+                f"Total cars: {len(cars)}",
+                f"Moving cars: {moving_cars}",
+                f"Spawned this frame: {cars_spawned_this_frame}",
+                f"Removed this frame: {cars_removed_this_frame}",
+                f"Next cleanup in: {int(cleanup_interval - (time.time() - last_cleanup_time))}s"
+            ]
+            
+            for i, text in enumerate(debug_text):
+                debug_surface = font.render(text, True, (255, 255, 0))
+                screen.blit(debug_surface, (10, height - 30 - i * 25))
         
         pygame.display.flip()
         clock.tick(FPS)
