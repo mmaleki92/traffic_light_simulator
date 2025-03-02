@@ -72,20 +72,6 @@ def draw_road(screen):
     for x in range(0, width, 40):
         pygame.draw.line(screen, WHITE, (x, height // 2), (x + 20, height // 2), 3)  # Thicker lines
 
-    # Corrected lane arrows for vertical road
-    # Left lane arrows (pointing upwards)
-    # draw_arrow(screen, WHITE, (width // 2 - lane_width, 3 * height // 4 + 30), (width // 2 - lane_width, 3 * height // 4))
-    # draw_arrow(screen, WHITE, (width // 2 - lane_width, height // 4 + 30), (width // 2 - lane_width, height // 4))
-
-    # # Right lane arrows (pointing downwards)
-    # draw_arrow(screen, WHITE, (width // 2 + lane_width, height // 4 - 30), (width // 2 + lane_width, height // 4))
-    # draw_arrow(screen, WHITE, (width // 2 + lane_width, 3 * height // 4 - 30), (width // 2 + lane_width, 3 * height // 4))
-
-    # # Horizontal road arrows (already corrected previously)
-    # draw_arrow(screen, WHITE, (width // 4, height // 2 - lane_width), (width // 4 + 30, height // 2 - lane_width))  # Left
-    # draw_arrow(screen, WHITE, (3 * width // 4 + 30, height // 2 + lane_width), (3 * width // 4, height // 2 + lane_width))  # Right
-    # draw_arrow(screen, WHITE, (width // 4 - 30, height // 2 + lane_width), (width // 4, height // 2 + lane_width))  # Left opposite lane
-    # draw_arrow(screen, WHITE, (3 * width // 4, height // 2 - lane_width), (3 * width // 4 + 30, height // 2 - lane_width))  # Right opposite lane
 def draw_traffic_light(surface, pos, red_on, yellow_on, green_on, direction):
     if direction not in ['left', 'right']:
         light_width, light_height = 60, 20  # Horizontal layout
