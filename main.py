@@ -24,6 +24,23 @@ lane_counters = {
     'right': 0
 }
 
+# Track spawn timers for each direction
+spawn_timers = {
+    'up-down': 0,
+    'down-up': 0,
+    'left-right': 0,
+    'right-left': 0
+}
+# Spawn intervals (in frames) for each direction
+spawn_intervals = {
+    'up-down': 60,  # Spawn a car every ~2 seconds (with 30 FPS)
+    'down-up': 70,
+    'left-right': 65,
+    'right-left': 75
+}
+# Maximum number of cars (set this to a reasonable number based on your system performance)
+MAX_CARS = 100
+
 def fetch_lane_counters():
     try:
         response = requests.get(f"{BASE_URL}/lane-counters")
@@ -67,53 +84,66 @@ def log_accident(is_accident, message):
     return False
 
 
-def spawn_cars(cars, spawn_rate=0.1):
-    global lane_counters  # Ensure we use the global lane_counters
-    if random.random() < spawn_rate:
-        direction = random.choice(['up-down', 'down-up', 'left-right', 'right-left'])
-        road_width = 50  # Increased to accommodate 4 lanes in total, 2 per direction
-        lane_width = road_width // 4  # 4 lanes, each lane has a width of road_width/4
-        
-        if direction in ['up-down', 'down-up']:
-            # Choose a random lane among the two available for the direction
-            lane_number = random.choice([1, 2])  # 1 or 2 for top and bottom lanes
-            lane_base_left = width // 2 - road_width // 2 + lane_width * (lane_number - 1)
-            lane_base_right = width // 2 + road_width // 2 - lane_width * lane_number
+def spawn_cars(cars):
+    global lane_counters, spawn_timers  # Use the global counters and timers
+    
+    # Don't spawn more cars if we've reached the maximum
+    if len(cars) >= MAX_CARS:
+        return
+    
+    # Update all spawn timers
+    for direction in spawn_timers:
+        spawn_timers[direction] += 1
+    
+    # Try to spawn cars for each direction if timer is up
+    for direction in spawn_timers:
+        if spawn_timers[direction] >= spawn_intervals[direction]:
+            spawn_timers[direction] = 0  # Reset the timer
             
-            if direction == 'up-down':
-                y_position = -20
-                speed = 2
-                lane_position = lane_base_left + lane_width // 2 - 14
-                lane_counters['top'] += 1
-            else:
-                y_position = height + 30
-                speed = -2
-                lane_position = lane_base_right + lane_width // 2
-                lane_counters['bottom'] += 1
-
-            car = Car(lane_position, y_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'vertical', direction)
-        else:
-            # Choose a random lane among the two available for the direction
-            lane_number = random.choice([1, 2])  # 1 or 2 for left and right lanes
-            lane_base_top = height // 2 - road_width // 2 + lane_width * (lane_number - 1)
-            lane_base_bottom = height // 2 + road_width // 2 - lane_width * lane_number
+            # Spawn the car
+            road_width = 50  # Increased to accommodate 4 lanes in total, 2 per direction
+            lane_width = road_width // 4  # 4 lanes, each lane has a width of road_width/4
             
-            if direction == 'left-right':
-                x_position = -30
-                speed = 2
-                lane_position = lane_base_bottom + lane_width // 2 
-                lane_counters['left'] += 1
+            if direction in ['up-down', 'down-up']:
+                # Choose a random lane among the two available for the direction
+                lane_number = random.choice([1, 2])  # 1 or 2 for top and bottom lanes
+                lane_base_left = width // 2 - road_width // 2 + lane_width * (lane_number - 1)
+                lane_base_right = width // 2 + road_width // 2 - lane_width * lane_number
+                
+                if direction == 'up-down':
+                    y_position = -20
+                    speed = 2
+                    lane_position = lane_base_left + lane_width // 2 - 14
+                    lane_counters['top'] += 1
+                else:
+                    y_position = height + 30
+                    speed = -2
+                    lane_position = lane_base_right + lane_width // 2
+                    lane_counters['bottom'] += 1
+
+                car = Car(lane_position, y_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'vertical', direction)
             else:
-                x_position = width + 30
-                speed = -2
-                lane_position = lane_base_top + lane_width // 2 -10
-                lane_counters['right'] += 1
+                # Choose a random lane among the two available for the direction
+                lane_number = random.choice([1, 2])  # 1 or 2 for left and right lanes
+                lane_base_top = height // 2 - road_width // 2 + lane_width * (lane_number - 1)
+                lane_base_bottom = height // 2 + road_width // 2 - lane_width * lane_number
+                
+                if direction == 'left-right':
+                    x_position = -30
+                    speed = 2
+                    lane_position = lane_base_bottom + lane_width // 2 
+                    lane_counters['left'] += 1
+                else:
+                    x_position = width + 30
+                    speed = -2
+                    lane_position = lane_base_top + lane_width // 2 -10
+                    lane_counters['right'] += 1
 
-            car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal', direction)
+                car = Car(x_position, lane_position, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), speed, 'horizontal', direction)
 
-        cars.add(car)  # Use add() instead of append()
-        update_lane_counters(lane_counters)
-        print(f"Added car: {direction} at: {lane_position} with speed {speed}")
+            cars.add(car)  # Use add() instead of append()
+            update_lane_counters(lane_counters)
+            print(f"Added car: {direction} at: {lane_position} with speed {speed}")
 
 def manage_traffic_lights(cars, lights):
     stop_distance = 50
@@ -178,6 +208,7 @@ def draw_map_surface(tmx_data, scale):
     scaled_surface = pygame.transform.scale(map_surface, (int(map_width * scale), int(map_height * scale)))
     
     return scaled_surface
+
 def main():
     tmx_data = load_map("map.tmx")
     map_width = tmx_data.width * tmx_data.tilewidth
@@ -195,6 +226,9 @@ def main():
     lane_counters.update(fetch_lane_counters())
     traffic_lights = fetch_traffic_lights()
 
+    # Display stats
+    font = pygame.font.Font(None, 24)
+
     while running:
         screen.fill(BLACK)
         draw_lane_counters(screen)
@@ -203,9 +237,12 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        # draw_road(screen)
-        spawn_cars(cars, spawn_rate=0.05)
-        print(f"Total cars: {len(cars)}")  # Debugging print
+        # Spawn cars with our new deterministic approach
+        spawn_cars(cars)
+        
+        # Display number of cars
+        cars_text = font.render(f"Cars: {len(cars)}/{MAX_CARS}", True, (255, 255, 255))
+        screen.blit(cars_text, (width - 150, 20))
 
         manage_traffic_lights(cars, traffic_lights)
         traffic_lights = fetch_traffic_lights()
@@ -213,17 +250,15 @@ def main():
         if check_for_accidents(traffic_lights):
             log_accident(True, "Warning: Potential accident! Both vertical and horizontal lanes have green lights!")
         
-        # cars.update()  # Move all cars
-        
-        for car in cars:
+        # Update all cars
+        for car in list(cars):  # Make a copy of the cars list for safe iteration
             car.update(cars)
-        
-        for car in cars:
+            
+            # Check if car is out of bounds and remove if necessary
             if car.is_out_of_bounds(width, height):
-                update_lane_counters(lane_counters)
                 cars.remove(car)  # Remove the car if it is out of bounds
-                print(f"Car removed: Remaining cars: {len(cars)}")  # Debugging print
-    
+        
+        # Draw the map and all the objects
         screen.blit(scaled_map_surface, (0, 0))
         cars.draw(screen)
         for light in traffic_lights:
@@ -231,8 +266,6 @@ def main():
         
         pygame.display.flip()
         clock.tick(FPS)
-
-
 
 if __name__ == '__main__':
     main()
